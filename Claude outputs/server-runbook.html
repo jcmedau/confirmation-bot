@@ -1,0 +1,697 @@
+<title>SkyPower Bot — Server Runbook</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg:        #F4F6FA;
+    --surface:   #FFFFFF;
+    --surface2:  #EEF1F7;
+    --border:    #DDE2ED;
+    --text:      #151C2F;
+    --muted:     #5A6580;
+    --accent:    #2660E8;
+    --accent-bg: #EBF0FD;
+    --code-bg:   #0D1117;
+    --code-text: #CDD5E0;
+    --code-dim:  #6B7A99;
+    --green:     #16A34A;
+    --green-bg:  #DCFCE7;
+    --amber:     #B45309;
+    --amber-bg:  #FEF3C7;
+    --tag-bg:    #E8ECF8;
+    --tag-text:  #2660E8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:        #080D1A;
+      --surface:   #0F1624;
+      --surface2:  #141D30;
+      --border:    #1E2A42;
+      --text:      #D8DFEE;
+      --muted:     #6B7A99;
+      --accent:    #4A80F5;
+      --accent-bg: #0F1E40;
+      --code-bg:   #060B14;
+      --code-text: #CDD5E0;
+      --code-dim:  #4A5770;
+      --green:     #4ADE80;
+      --green-bg:  #052E16;
+      --amber:     #FCD34D;
+      --amber-bg:  #1C1200;
+      --tag-bg:    #0F1E40;
+      --tag-text:  #4A80F5;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:        #080D1A;
+    --surface:   #0F1624;
+    --surface2:  #141D30;
+    --border:    #1E2A42;
+    --text:      #D8DFEE;
+    --muted:     #6B7A99;
+    --accent:    #4A80F5;
+    --accent-bg: #0F1E40;
+    --code-bg:   #060B14;
+    --code-text: #CDD5E0;
+    --code-dim:  #4A5770;
+    --green:     #4ADE80;
+    --green-bg:  #052E16;
+    --amber:     #FCD34D;
+    --amber-bg:  #1C1200;
+    --tag-bg:    #0F1E40;
+    --tag-text:  #4A80F5;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    background: var(--bg);
+    color: var(--text);
+    padding-inline: 20px;
+    padding-block: 48px 80px;
+  }
+
+  .page {
+    max-width: 820px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 48px;
+    padding-bottom: 28px;
+    border-bottom: 1.5px solid var(--border);
+  }
+  .header-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+  .header h1 {
+    font-size: clamp(22px, 4vw, 32px);
+    font-weight: 700;
+    line-height: 1.2;
+    text-wrap: balance;
+    color: var(--text);
+  }
+  .header-meta {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 4px;
+    background: var(--tag-bg);
+    color: var(--tag-text);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* Quick ref table */
+  .ref-table {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 48px;
+  }
+  .ref-table-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .ref-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .ref-table td {
+    padding: 9px 18px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .ref-table tr:last-child td { border-bottom: none; }
+  .ref-table td:first-child { color: var(--muted); width: 160px; white-space: nowrap; }
+  .ref-table code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--text);
+    background: var(--surface2);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  /* Sections */
+  .section {
+    margin-bottom: 52px;
+  }
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .step-num {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    min-width: 28px;
+  }
+  .section-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .section-body {
+    padding-left: 42px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .note {
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .callout {
+    background: var(--amber-bg);
+    color: var(--amber);
+    border-left: 3px solid var(--amber);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .callout-ok {
+    background: var(--green-bg);
+    color: var(--green);
+    border-left: 3px solid var(--green);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  /* Sub-steps */
+  .substep {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .substep-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+
+  /* Code blocks */
+  .code-block {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--code-bg);
+  }
+  .code-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 14px;
+    background: rgba(255,255,255,.04);
+    border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+  .code-lang {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--code-dim);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+  .copy-btn {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--code-dim);
+    background: none;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 4px;
+    padding: 2px 9px;
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+  }
+  .copy-btn:hover { color: var(--code-text); border-color: rgba(255,255,255,.25); }
+  .copy-btn.copied { color: #4ADE80; border-color: #4ADE80; }
+  pre {
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--code-text);
+  }
+  pre .dim   { color: var(--code-dim); }
+  pre .key   { color: #7DD3FC; }
+  pre .val   { color: #86EFAC; }
+  pre .flag  { color: #C4B5FD; }
+
+  /* Divider */
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin-block: 48px;
+  }
+
+  /* Verify section */
+  .verify-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+  }
+  .verify-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .verify-card-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .verify-card code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    word-break: break-all;
+  }
+
+  @media (max-width: 560px) {
+    .section-body { padding-left: 0; }
+    .ref-table td:first-child { width: 110px; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="header">
+    <div class="header-eyebrow">Infrastructure Runbook</div>
+    <h1>SkyPower Confirmation Bot — Server Setup</h1>
+    <div class="header-meta">
+      <span class="badge">Docker</span>
+      <span class="badge">Redis</span>
+      <span class="badge">PostgreSQL 15</span>
+      <span class="badge">Evolution API v2</span>
+      <span class="badge">Spring Boot 4.1.1</span>
+    </div>
+  </header>
+
+  <!-- Quick reference -->
+  <div class="ref-table">
+    <div class="ref-table-title">Quick Reference</div>
+    <table>
+      <tr><td>Docker network</td><td><code>mysql-network</code></td></tr>
+      <tr><td>Redis container</td><td><code>redis</code> · internal port 6379</td></tr>
+      <tr><td>Postgres container</td><td><code>postgres</code> · internal port 5432</td></tr>
+      <tr><td>Postgres DB</td><td><code>evolution</code> · user <code>postgres</code> · pass <code>SkyPowerDat@tabase2026</code></td></tr>
+      <tr><td>Evolution API</td><td><code>evolution_api</code> · host port <code>8083</code></td></tr>
+      <tr><td>Evolution API key</td><td><code>SkyPowerWapp2026!</code></td></tr>
+      <tr><td>Evolution image</td><td><code>evoapicloud/evolution-api:latest</code></td></tr>
+      <tr><td>WhatsApp instance</td><td><code>skypower-main</code></td></tr>
+      <tr><td>Appointment Bot</td><td><code>appointment-bot</code> · host port <code>8084</code></td></tr>
+      <tr><td>Bot webhook URL</td><td><code>http://appointment-bot:8080/webhook/evolution</code></td></tr>
+      <tr><td>Google Calendar ID</td><td><code>joao.c.medau@gmail.com</code></td></tr>
+    </table>
+  </div>
+
+  <!-- Step 1 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-num">01</span>
+      <h2>Create Docker Network</h2>
+    </div>
+    <div class="section-body">
+      <p class="note">All containers communicate over this bridge network. Run once — skip if it already exists.</p>
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre>sudo docker network create mysql-network</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">verify</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre>sudo docker network ls | grep mysql-network</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-num">02</span>
+      <h2>Start Redis</h2>
+    </div>
+    <div class="section-body">
+      <p class="note">Used by Evolution API as its cache provider. No persistent volume needed — cache is ephemeral.</p>
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre>sudo docker run -d \
+  <span class="flag">--name</span> redis \
+  <span class="flag">--network</span> mysql-network \
+  <span class="flag">--restart</span> unless-stopped \
+  redis:latest</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">verify</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre>sudo docker logs redis --tail 5
+<span class="dim"># Expected: Ready to accept connections</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-num">03</span>
+      <h2>Start PostgreSQL</h2>
+    </div>
+    <div class="section-body">
+      <p class="note">Evolution API v2 requires PostgreSQL — it uses Prisma with PostgreSQL-dialect raw queries even when configured for another provider.</p>
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre>sudo docker run -d \
+  <span class="flag">--name</span> postgres \
+  <span class="flag">--network</span> mysql-network \
+  <span class="flag">--restart</span> unless-stopped \
+  <span class="flag">-e</span> <span class="key">POSTGRES_USER</span>=<span class="val">postgres</span> \
+  <span class="flag">-e</span> <span class="key">POSTGRES_PASSWORD</span>=<span class="val">SkyPowerDat@tabase2026</span> \
+  <span class="flag">-e</span> <span class="key">POSTGRES_DB</span>=<span class="val">evolution</span> \
+  <span class="flag">-v</span> postgres_data:/var/lib/postgresql/data \
+  postgres:15</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">verify</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre>sudo docker logs postgres --tail 5
+<span class="dim"># Expected: database system is ready to accept connections</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-num">04</span>
+      <h2>Start Evolution API</h2>
+    </div>
+    <div class="section-body">
+      <p class="note">WhatsApp gateway. Connects to PostgreSQL for state and Redis for cache. Wait for PostgreSQL to be fully ready before running this.</p>
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre>sudo docker run -d \
+  <span class="flag">--name</span> evolution_api \
+  <span class="flag">--network</span> mysql-network \
+  <span class="flag">-p</span> 8083:8080 \
+  <span class="flag">--restart</span> unless-stopped \
+  <span class="flag">-v</span> evolution_instances:/evolution/instances \
+  <span class="flag">-e</span> <span class="key">ENV</span>=<span class="val">prod</span> \
+  <span class="flag">-e</span> <span class="key">DATABASE_CONNECTION_URI</span>=<span class="val">"postgresql://postgres:SkyPowerDat%40tabase2026@postgres:5432/evolution"</span> \
+  <span class="flag">-e</span> <span class="key">DATABASE_ENABLED</span>=<span class="val">true</span> \
+  <span class="flag">-e</span> <span class="key">DATABASE_PROVIDER</span>=<span class="val">postgresql</span> \
+  <span class="flag">-e</span> <span class="key">CACHE_PROVIDER</span>=<span class="val">redis</span> \
+  <span class="flag">-e</span> <span class="key">CACHE_REDIS_URI</span>=<span class="val">redis://redis:6379</span> \
+  <span class="flag">-e</span> <span class="key">CACHE_ENABLED</span>=<span class="val">true</span> \
+  <span class="flag">-e</span> <span class="key">AUTHENTICATION_TYPE</span>=<span class="val">apikey</span> \
+  <span class="flag">-e</span> <span class="key">AUTHENTICATION_API_KEY</span>=<span class="val">SkyPowerWapp2026!</span> \
+  <span class="flag">-e</span> <span class="key">SERVER_URL</span>=<span class="val">http://messages.skypower-aviation.com</span> \
+  <span class="flag">-e</span> <span class="key">CONFIG_SESSION_PHONE_CLIENT</span>=<span class="val">Evolution</span> \
+  <span class="flag">-e</span> <span class="key">WEBSOCKET_ENABLED</span>=<span class="val">true</span> \
+  evoapicloud/evolution-api:latest</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">verify</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre>curl -s http://localhost:8083/ -H 'apikey: SkyPowerWapp2026!'
+<span class="dim"># Expected: JSON response (not connection refused)</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 5 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-num">05</span>
+      <h2>Start Appointment Bot</h2>
+    </div>
+    <div class="section-body">
+      <p class="note">Build the jar on your Mac, copy it to the server, then build and run the Docker image.</p>
+
+      <div class="substep">
+        <div class="substep-label">A — Build on Mac</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">mac terminal</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>cd ~/Developer/confirmation-bot
+./mvnw clean package -DskipTests</pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">B — Copy jar to server</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">mac terminal</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>scp target/confirmation-bot-*.jar medau@skypowerserver:~/confirmation-bot.jar
+scp Dockerfile medau@skypowerserver:~/Dockerfile
+scp credentials/service-account.json medau@skypowerserver:~/service-account.json</pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">C — Build image on server</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">server</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>cd ~
+sudo docker build --no-cache -t appointment-bot .</pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">D — Run container</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">server</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>sudo docker run -d \
+  <span class="flag">--name</span> appointment-bot \
+  <span class="flag">--network</span> mysql-network \
+  <span class="flag">-p</span> 8084:8080 \
+  <span class="flag">--restart</span> unless-stopped \
+  appointment-bot</pre>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">verify</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre>sudo docker logs appointment-bot --tail 20
+<span class="dim"># Expected: Started ConfirmationBotApplication</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 6 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-num">06</span>
+      <h2>Configure WhatsApp Instance</h2>
+    </div>
+    <div class="section-body">
+      <div class="callout">Only needed when setting up from scratch or after the WhatsApp session was removed as a linked device. If the <code>evolution_instances</code> volume is intact from a previous run, the session persists — skip to step 7.</div>
+
+      <div class="substep">
+        <div class="substep-label">A — Create instance</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>curl -s -X POST 'http://localhost:8083/instance/create' \
+  -H 'apikey: SkyPowerWapp2026!' \
+  -H 'Content-Type: application/json' \
+  -d '{"instanceName": "skypower-main", "qrcode": true}'</pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">B — Get QR code</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>curl -s 'http://localhost:8083/instance/connect/skypower-main' \
+  -H 'apikey: SkyPowerWapp2026!'
+<span class="dim"># Returns a base64 QR code. Open WhatsApp → Linked Devices → scan it.</span></pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">C — Verify connection</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>curl -s 'http://localhost:8083/instance/connectionState/skypower-main' \
+  -H 'apikey: SkyPowerWapp2026!'
+<span class="dim"># Expected: {"instance":{"instanceName":"skypower-main","state":"open"}}</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 7 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-num">07</span>
+      <h2>Register Webhook</h2>
+    </div>
+    <div class="section-body">
+      <p class="note">Tells Evolution API to call the appointment bot whenever a message is received. The bot also auto-registers this on startup via <code>EvolutionWebhookRegistrar</code> — run this manually only if the bot isn't doing it or you need to verify.</p>
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre>curl -s -X POST 'http://localhost:8083/webhook/set/skypower-main' \
+  -H 'apikey: SkyPowerWapp2026!' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "url": "http://appointment-bot:8080/webhook/evolution",
+    "webhook_by_events": false,
+    "webhook_base64": false,
+    "events": ["MESSAGES_UPSERT"]
+  }'</pre>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">Verify webhook is registered</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>curl -s 'http://localhost:8083/webhook/find/skypower-main' \
+  -H 'apikey: SkyPowerWapp2026!'
+<span class="dim"># Expected: shows url "http://appointment-bot:8080/webhook/evolution"</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- Useful commands -->
+  <div class="section">
+    <div class="section-header">
+      <span class="step-num">—</span>
+      <h2>Day-to-Day Commands</h2>
+    </div>
+    <div class="section-body">
+
+      <div class="substep">
+        <div class="substep-label">Check all containers</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>sudo docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'</pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">Follow bot logs</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>sudo docker logs appointment-bot -f --tail 50</pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">Follow Evolution API logs</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>sudo docker logs evolution_api -f --tail 50</pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">Redeploy bot only (new jar built)</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>sudo docker stop appointment-bot && sudo docker rm appointment-bot
+sudo docker build --no-cache -t appointment-bot .
+sudo docker run -d \
+  --name appointment-bot \
+  --network mysql-network \
+  -p 8084:8080 \
+  --restart unless-stopped \
+  appointment-bot</pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">Simulate incoming patient reply (test webhook)</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>curl -s -X POST 'http://localhost:8084/webhook/evolution' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "event": "messages.upsert",
+    "instance": "skypower-main",
+    "data": {
+      "key": {
+        "remoteJid": "5519991278903@s.whatsapp.net",
+        "fromMe": false,
+        "id": "TEST001"
+      },
+      "message": { "conversation": "1" },
+      "pushName": "Paciente Teste"
+    }
+  }'</pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">Restart all services</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>sudo docker restart redis postgres evolution_api appointment-bot</pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">Wipe and recreate everything (nuclear reset)</div>
+        <div class="callout" style="margin-bottom:8px;">⚠ This deletes all WhatsApp session data. You will need to scan the QR code again.</div>
+        <div class="code-block">
+          <div class="code-block-header"><span class="code-lang">bash</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+          <pre>sudo docker stop appointment-bot evolution_api postgres redis
+sudo docker rm appointment-bot evolution_api postgres redis
+sudo docker volume rm evolution_instances postgres_data
+<span class="dim"># Then re-run steps 1–7 above.</span></pre>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  // Strip HTML tags to get plain text
+  const text = pre.innerText || pre.textContent;
+  navigator.clipboard.writeText(text.trim()).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1800);
+  });
+}
+</script>
