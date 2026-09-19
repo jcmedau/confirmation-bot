@@ -35,30 +35,34 @@ class GoogleCalendarIntegrationTest {
 
     @Test
     void fetchTomorrowAppointments() {
-        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        // Uses the same holiday-aware, day-of-week logic as the production scheduler
+        LocalDate today   = LocalDate.now();
+        List<LocalDate> targets = notificationService.targetDatesForTest(today);
         DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
 
-        List<Appointment> appointments = calendarService.fetchAllAppointmentsForDay(tomorrow);
-
         System.out.println();
-        System.out.println("╔══════════════════════════════════════════════════════════╗");
-        System.out.printf ("║  Appointments for %-38s║%n", tomorrow);
+        System.out.printf("╔══════════════════════════════════════════════════════════╗%n");
+        System.out.printf("║  Today: %-49s║%n", today);
+        System.out.printf("║  Target dates: %-42s║%n", targets);
         System.out.println("╠══════════════════════════════════════════════════════════╣");
 
-        if (appointments.isEmpty()) {
-            System.out.println("║  No appointments found.                                  ║");
-        } else {
+        int total = 0;
+        for (LocalDate date : targets) {
+            List<Appointment> appointments = calendarService.fetchAllAppointmentsForDay(date);
+            System.out.printf("║  ── %s (%d appt(s)) %-27s║%n",
+                    date, appointments.size(), "");
             for (Appointment a : appointments) {
-                String time  = a.startTime() != null ? a.startTime().format(timeFmt) : "all-day";
+                String time  = (a.startTime() != null && !a.allDay()) ? a.startTime().format(timeFmt) : "all-day";
                 String name  = a.patientName() != null ? a.patientName() : "(no title)";
                 String phone = a.phoneNumber() != null ? a.phoneNumber() : "no phone";
-                System.out.printf("║  %s  %-30s  %-12s  [%s]%n",
-                        time, truncate(name, 30), truncate(phone, 12), a.status());
+                System.out.printf("║     %s  %-28s  %-10s  [%s]%n",
+                        time, truncate(name, 28), truncate(phone, 10), a.status());
+                total++;
             }
         }
 
         System.out.println("╠══════════════════════════════════════════════════════════╣");
-        System.out.printf ("║  Total: %-49s║%n", appointments.size());
+        System.out.printf ("║  Total: %-49s║%n", total);
         System.out.println("╚══════════════════════════════════════════════════════════╝");
         System.out.println();
     }
@@ -257,5 +261,84 @@ class GoogleCalendarIntegrationTest {
         System.out.println();
 
         org.junit.jupiter.api.Assertions.assertTrue(sent, "WhatsApp message should be sent successfully");
+    }
+
+
+    /**
+     * Sends confirmation messages for Saturday, Sunday AND Monday.
+     * Run on a Friday — the service's day-of-week logic targets all three days.
+     * ⚠️  This fires real WhatsApp messages and marks appointments AWAITING_REPLY.
+     */
+    @Test
+    void sendFridayConfirmations() {
+        LocalDate today   = LocalDate.now();
+        List<LocalDate> targets = notificationService.targetDatesForTest(today);
+
+        System.out.println();
+        System.out.println("╔══════════════════════════════════════════════════════════╗");
+        System.out.printf ("║  FRIDAY SWEEP — today: %-33s║%n", today);
+        System.out.printf ("║  Target dates: %-42s║%n", targets);
+        System.out.println("╠══════════════════════════════════════════════════════════╣");
+
+        int totalPending = 0;
+        for (LocalDate date : targets) {
+            long pending = calendarService.fetchAllAppointmentsForDay(date).stream()
+                    .filter(a -> a.status() == com.skypower.confirmation_bot.model.AppointmentStatus.PENDING)
+                    .filter(a -> a.phoneNumber() != null && !a.phoneNumber().isBlank())
+                    .count();
+            System.out.printf("║  %s  →  %d pending appointment(s)%-20s║%n", date, pending, "");
+            totalPending += pending;
+        }
+
+        System.out.println("╠══════════════════════════════════════════════════════════╣");
+        System.out.printf ("║  Sending %d message(s) now...%-29s║%n", totalPending, "");
+        System.out.println("╚══════════════════════════════════════════════════════════╝");
+        System.out.println();
+
+        notificationService.sendPendingConfirmations();
+
+        System.out.println();
+        System.out.println("Done — check WhatsApp and the calendar (statuses → AWAITING_REPLY).");
+    }
+
+
+    /**
+     * Shows the status of every appointment for today, tomorrow, Sunday and Monday.
+     * Safe to run — read-only, no messages sent, no calendar changes.
+     */
+    @Test
+    void showWeekendAppointmentStatus() {
+        LocalDate today  = LocalDate.now();
+        List<LocalDate> dates = List.of(today, today.plusDays(1), today.plusDays(2), today.plusDays(3));
+        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
+
+        System.out.println();
+        System.out.println("╔══════════════════════════════════════════════════════════════════════╗");
+        System.out.printf ("║  APPOINTMENT STATUS — %s (Fri) → %s (Mon)  ║%n", today, today.plusDays(3));
+        System.out.println("╠══════════════════════════════════════════════════════════════════════╣");
+
+        int grandTotal = 0;
+        for (LocalDate date : dates) {
+            List<Appointment> appts = calendarService.fetchAllAppointmentsForDay(date);
+            System.out.printf("║  ── %s (%s) — %d appointment(s) %s║%n",
+                    date, date.getDayOfWeek(), appts.size(),
+                    " ".repeat(Math.max(0, 28 - String.valueOf(appts.size()).length() - date.getDayOfWeek().toString().length())));
+            if (appts.isEmpty()) {
+                System.out.println("║     (none)                                                           ║");
+            }
+            for (Appointment a : appts) {
+                String time   = (a.startTime() != null && !a.allDay()) ? a.startTime().format(timeFmt) : "all-day";
+                String name   = truncate(a.patientName() != null ? a.patientName() : "(no title)", 24);
+                String phone  = truncate(a.phoneNumber() != null ? a.phoneNumber() : "no phone", 14);
+                String status = a.status() != null ? a.status().name() : "UNKNOWN";
+                System.out.printf("║     %s  %-24s  %-14s  %-14s║%n", time, name, phone, status);
+                grandTotal++;
+            }
+        }
+
+        System.out.println("╠══════════════════════════════════════════════════════════════════════╣");
+        System.out.printf ("║  Total: %-61s║%n", grandTotal + " appointment(s)");
+        System.out.println("╚══════════════════════════════════════════════════════════════════════╝");
+        System.out.println();
     }
 }

@@ -105,6 +105,9 @@ public class AppointmentNotificationService {
      * dates that holiday would have covered are added to the set.
      * This handles back-to-back holidays automatically.
      */
+    /** Package-visible for integration tests. */
+    public List<LocalDate> targetDatesForTest(LocalDate today) { return buildTargetDates(today); }
+
     private List<LocalDate> buildTargetDates(LocalDate today) {
         Set<LocalDate> visited  = new LinkedHashSet<>();
         Set<LocalDate> toExpand = new LinkedHashSet<>(defaultTargetDates(today));
@@ -165,8 +168,8 @@ public class AppointmentNotificationService {
 
     public void handleReply(String fromPhone, String messageBody) {
         String normalizedPhone = normalizePhone(fromPhone);
-        String reply = messageBody.trim();
-        log.info("Reply received from {}: '{}'", normalizedPhone, reply);
+        String reply = normalizeReply(messageBody);
+        log.info("Reply received from {}: '{}' (normalized: '{}')", normalizedPhone, messageBody.trim(), reply);
 
         Optional<Appointment> match = calendarService.fetchAwaitingReplyAppointments()
                 .stream()
@@ -181,26 +184,21 @@ public class AppointmentNotificationService {
 
         Appointment a = match.get();
 
-        switch (reply) {
-            case "1" -> {
-                calendarService.updateStatus(a.eventId(), AppointmentStatus.CONFIRMED);
-                whatsAppService.sendMessage(a.phoneNumber(), format(messageTemplates.getThanks(), a));
-                log.info("Appointment CONFIRMED for {}", a.patientName());
-            }
-            case "2" -> {
-                calendarService.updateStatus(a.eventId(), AppointmentStatus.RESCHEDULED);
-                whatsAppService.sendMessage(a.phoneNumber(), format(messageTemplates.getReschedule(), a));
-                log.info("Appointment RESCHEDULED for {}", a.patientName());
-            }
-            case "3" -> {
-                calendarService.updateStatus(a.eventId(), AppointmentStatus.CANCELLED);
-                whatsAppService.sendMessage(a.phoneNumber(), format(messageTemplates.getCancellation(), a));
-                log.info("Appointment CANCELLED for {}", a.patientName());
-            }
-            default -> {
-                log.info("Unrecognized reply '{}' from {} — sending invalid-option message", reply, normalizedPhone);
-                whatsAppService.sendMessage(a.phoneNumber(), messageTemplates.getInvalidOption());
-            }
+        if (isConfirm(reply)) {
+            calendarService.updateStatus(a.eventId(), AppointmentStatus.CONFIRMED);
+            whatsAppService.sendMessage(a.phoneNumber(), format(messageTemplates.getThanks(), a));
+            log.info("Appointment CONFIRMED for {}", a.patientName());
+        } else if (isReschedule(reply)) {
+            calendarService.updateStatus(a.eventId(), AppointmentStatus.RESCHEDULED);
+            whatsAppService.sendMessage(a.phoneNumber(), format(messageTemplates.getReschedule(), a));
+            log.info("Appointment RESCHEDULED for {}", a.patientName());
+        } else if (isCancel(reply)) {
+            calendarService.updateStatus(a.eventId(), AppointmentStatus.CANCELLED);
+            whatsAppService.sendMessage(a.phoneNumber(), format(messageTemplates.getCancellation(), a));
+            log.info("Appointment CANCELLED for {}", a.patientName());
+        } else {
+            log.info("Unrecognized reply '{}' from {} — sending invalid-option message", reply, normalizedPhone);
+            whatsAppService.sendMessage(a.phoneNumber(), messageTemplates.getInvalidOption());
         }
     }
 
@@ -254,6 +252,38 @@ public class AppointmentNotificationService {
                 .replace("{nome}", name)
                 .replace("{data}", date)
                 .replace("{hora}", time);
+    }
+
+    // ── Reply normalization & matching ────────────────────────────────────────
+
+    /** Strips special characters and lowercases the raw reply for comparison. */
+    private String normalizeReply(String raw) {
+        if (raw == null) return "";
+        return raw.replace(String.valueOf((char) 34), "")
+                  .replaceAll("[!@#$%^&*():';/.,<>?`~=_+\\[\\]\\\\{}|()\\-]", "")
+                  .trim()
+                  .toLowerCase();
+    }
+
+    private boolean isConfirm(String reply) {
+        return reply.equals("1")
+            || reply.equals("confirmado")
+            || reply.equals("confirmar")
+            || reply.equals("confirmo");
+    }
+
+    private boolean isReschedule(String reply) {
+        return reply.equals("2")
+            || reply.equals("reagendar")
+            || reply.equals("reagendado")
+            || reply.equals("reagendo");
+    }
+
+    private boolean isCancel(String reply) {
+        return reply.equals("3")
+            || reply.equals("cancelar")
+            || reply.equals("cancelado")
+            || reply.equals("cancelo");
     }
 
     private String normalizePhone(String phone) {
